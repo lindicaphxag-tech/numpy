@@ -6500,7 +6500,7 @@ ufunc_at(PyUFuncObject *ufunc, PyObject *args)
         return NULL;
     }
 
-    if (ufunc->nin > 2) {
+    if (ufunc->nin == 0 || ufunc->nin > 2) {
         PyErr_SetString(PyExc_ValueError,
             "Only unary and binary ufuncs supported at this time");
         return NULL;
