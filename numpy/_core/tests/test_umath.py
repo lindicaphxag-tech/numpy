@@ -3942,6 +3942,11 @@ class TestSpecialMethods:
         assert_raises(TypeError, np.multiply.at, a)
         assert_raises(TypeError, np.multiply.at, a, a, a, a)
 
+        # A zero-input ufunc has no operand that can be applied to the indexed
+        # target. It must be rejected before ufunc.at builds its iterator state.
+        zero_input = np.frompyfunc(lambda: 1, 0, 1)
+        assert_raises(ValueError, zero_input.at, np.zeros(1), [0])
+
     def test_ufunc_override_out(self):
 
         class A:
