@@ -3521,3 +3521,11 @@ class TestUFuncInspectSignature:
                           for name, param in sig.parameters.items()
                           if param.kind is param.KEYWORD_ONLY}
         assert keyword_params == self.PARAMS_GUFUNC
+
+
+    def test_ufunc_at_zero_input(self):
+        # ``at`` only supports unary and binary ufuncs. A zero-input ufunc
+        # otherwise reaches dtype resolution with an invalid operand layout.
+        ufunc = np.frompyfunc(lambda: 0, nin=0, nout=1)
+        with pytest.raises(ValueError, match="Only unary and binary ufuncs"):
+            ufunc.at(np.empty((1,)), True)
