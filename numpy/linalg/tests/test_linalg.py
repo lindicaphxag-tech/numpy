@@ -1626,6 +1626,26 @@ class _TestNorm(_TestNorm2D, _TestNormGeneral):
     pass
 
 
+class TestNormStableScaling:
+
+    def test_float16_intermediate_overflow(self):
+        x = np.array([200, 200, 200], dtype=np.float16)
+
+        result = norm(x)
+
+        assert result.dtype == np.float16
+        assert np.isfinite(result)
+        assert_allclose(result, np.sqrt(3 * 200**2), rtol=5e-4)
+
+    def test_float32_large_magnitude_remains_finite(self):
+        x = np.array([1e20, -1e20, 1e20], dtype=np.float32)
+
+        result = norm(x)
+
+        assert result.dtype == np.float32
+        assert np.isfinite(result)
+        assert_allclose(result, np.sqrt(3.0) * 1e20, rtol=1e-6)
+
 class TestNorm_NonSystematic:
 
     def test_longdouble_norm(self):
