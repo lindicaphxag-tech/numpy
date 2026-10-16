@@ -1058,6 +1058,20 @@ det_from_slogdet(typ sign, typ logdet)
     return result;
 }
 
+/*
+ * Kahan's compensated 2x2 determinant uses fused multiply-add to avoid
+ * catastrophic cancellation in a*d - b*c when both products are finite.
+ * This path is intentionally limited to real floating-point types; complex
+ * determinants retain the existing LAPACK path.
+ */
+template<typename typ>
+static inline typ
+det_2x2_compensated(typ a, typ b, typ c, typ d)
+{
+    typ minus_bc = -b * c;
+    return std::fma(a, d, minus_bc) - std::fma(b, c, minus_bc);
+}
+
 
 npy_float npyabs(npy_cfloat z) { return npy_cabsf(z);}
 npy_double npyabs(npy_cdouble z) { return npy_cabs(z);}
@@ -1260,11 +1274,30 @@ det(char **args,
 
         BEGIN_OUTER_LOOP_2
             linearize_matrix((typ*)tmp_buff, (typ*)args[0], &lin_data);
+
+            if (m == 2) {
+                if constexpr (std::is_floating_point_v<typ>) {
+                    // tmp_buff is column-major: [a, c, b, d].
+                    typ a = ((typ*)tmp_buff)[0];
+                    typ b = ((typ*)tmp_buff)[2];
+                    typ c = ((typ*)tmp_buff)[1];
+                    typ d = ((typ*)tmp_buff)[3];
+                    typ result = det_2x2_compensated(a, b, c, d);
+                    // If the compensated path overflows or encounters a
+                    // non-finite intermediate, retain the general LAPACK
+                    // implementation and its established behavior.
+                    if (std::isfinite(result)) {
+                        *(typ*)args[1] = result;
+                        continue;
+                    }
+                }
+            }
+
             slogdet_single_element(m,
-                                         (typ*)tmp_buff,
-                                          (fortran_int*)(tmp_buff + matrix_size),
-                                          &sign,
-                                          &logdet);
+                                   (typ*)tmp_buff,
+                                   (fortran_int*)(tmp_buff + matrix_size),
+                                   &sign,
+                                   &logdet);
             *(typ *)args[1] = det_from_slogdet(sign, logdet);
         END_OUTER_LOOP
 
