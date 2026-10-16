@@ -2732,13 +2732,24 @@ def norm(x, ord=None, axis=None, keepdims=False):
             (ord == 2 and ndim == 1)
         ):
             x = x.ravel(order='K')
-            if isComplexType(x.dtype.type):
-                x_real = x.real
-                x_imag = x.imag
-                sqnorm = x_real.dot(x_real) + x_imag.dot(x_imag)
+            # Scale before squaring so low-precision inputs cannot overflow in the
+            # intermediate sum when the final norm is still representable.
+            absx = abs(x)
+            scale = absx.max(initial=0)
+            if scale == 0:
+                ret = scale
             else:
-                sqnorm = x.dot(x)
-            ret = sqrt(sqnorm)
+                scaled = x / scale
+                if x.dtype in (single, half, csingle):
+                    scaled = scaled.astype(cdouble if isComplexType(x.dtype.type) else double)
+                if isComplexType(x.dtype.type):
+                    x_real = scaled.real
+                    x_imag = scaled.imag
+                    sqnorm = x_real.dot(x_real) + x_imag.dot(x_imag)
+                else:
+                    sqnorm = scaled.dot(scaled)
+                ret = sqrt(sqnorm) * scale
+                ret = ret.astype(_realType(x.dtype.type), copy=False)
             if keepdims:
                 ret = ret.reshape(ndim * [1])
             return ret
