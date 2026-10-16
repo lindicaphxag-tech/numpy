@@ -532,6 +532,23 @@ class TestSolve(SolveCases):
         b = np.arange(2).reshape(1, 2).view(ArraySubclass)
         assert_raises(ValueError, linalg.solve, a, b)
 
+    def test_2x2_cancellation(self):
+        # GH-33062: LU factorization followed by slogdet can lose the sign and
+        # several orders of magnitude for nearly cancelling 2x2 determinants.
+        matrices = np.array(
+            [
+                [[1e9 + 1, 1e9], [1e9, 1e9 - 1]],
+                [[1e12 + 1, 1e12], [1e12, 1e12 - 1]],
+                [[1e15 + 1, 1e15], [1e15, 1e15 - 1]],
+            ],
+            dtype=np.float64,
+        )
+
+        result = np.linalg.det(matrices)
+
+        assert_equal(result, np.array([-1.0, -1.0, -1.0]))
+        assert_equal(np.linalg.det(matrices[0]), -1.0)
+
     def test_0_size(self):
         class ArraySubclass(np.ndarray):
             pass
